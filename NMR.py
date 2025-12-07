@@ -1,13 +1,9 @@
 import numpy as np #FFTに使用します
 import struct #バイナリの読み込みに使用します
-import matplotlib.pyplot as plt #グラフ
-import openpyxl  as opx #エクセルの書き込みに使用
-import sys #システム諸々で使用します
 
-#今後追加予定の項目
+#-------------------今後追加予定の項目------------------------------------
 #ゼロパディングモードの実装
 #窓関数のテスト
-#リストを完成させる
 #NMR信号のファイルパス一覧を返す関数
 
 #ピーク計算&重心計算モード(積分機能の実装)
@@ -35,33 +31,35 @@ block_def = {
     'GAIN'              : {'offset': 65842, 'type': 'd'},
     'Phas'              : {'offset': 65850, 'type': 'd'},
     'LPF1'              : {'offset': 65858, 'type': 'd'},
-    'XYZ'               : {'offset': 65876, 'type': '3d'},
+    'X'                 : {'offset': 65876, 'type': 'd'},
+    'Y'                 : {'offset': 65884, 'type': 'd'},
+    'Z'                 : {'offset': 65892, 'type': 'd'},
     'isDouble'          : {'offset': 65900, 'type': 'h'},
     'blank'             : {'offset': 65902, 'type': 'd'},
     'cpn'               : {'offset': 65910, 'type': 'h'},
     'cpw'               : {'offset': 65912, 'type': 'd'},
     'cpi'               : {'offset': 65920, 'type': 'd'},
     'fpw'               : {'offset': 65928, 'type': 'd'},
-    'spw'               :{'offset': 65936, 'type': 'd'},
-    'tJ'                :{'offset': 65944, 'type': 'd'},
-    't2'                :{'offset': 65952, 'type': 'd'},
-    'ADOFF'             :{'offset': 65960, 'type': 'd'},
-    'Reserve1'          :{'offset': 65968, 'type': 'd'},
-    'OSCILLO'           :{'offset': 65976, 'type': 'h'},
-    'PowLevel'          :{'offset': 65978, 'type': 'h'},
-    'QPSKComb'          :{'offset': 65980, 'type': 'h'},
-    'QPSK1st'           :{'offset': 65982, 'type': 'h'},
-    'QPSK2nd'           :{'offset': 65984, 'type': 'h'},
-    'ADTrigLocation'    :{'offset': 65986, 'type': 'h'},
-    'EXTTRIG'           :{'offset': 65988, 'type': 'h'},
-    'BlankIsLoopTime'   :{'offset': 65990, 'type': 'h'},
-    'UseComb'           :{'offset': 65992, 'type': 'h'},
-    'QPSKRX'            :{'offset': 65994, 'type': 'h'},
-    'mDate'             :{'offset': 65996, 'type': '20c'},
-    'mTime'             :{'offset': 66026, 'type': '30c'},
-    'real'              :{'offset': 66056, 'type': 'd'},
-    'mTitle'            :{'offset': 66064, 'type': '32c'},
-    'wavesize'          :{'offset': 66096, 'type': 'i'}
+    'spw'               : {'offset': 65936, 'type': 'd'},
+    'tJ'                : {'offset': 65944, 'type': 'd'},
+    't2'                : {'offset': 65952, 'type': 'd'},
+    'ADOFF'             : {'offset': 65960, 'type': 'd'},
+    'Reserve1'          : {'offset': 65968, 'type': 'd'},
+    'OSCILLO'           : {'offset': 65976, 'type': 'h'},
+    'PowLevel'          : {'offset': 65978, 'type': 'h'},
+    'QPSKComb'          : {'offset': 65980, 'type': 'h'},
+    'QPSK1st'           : {'offset': 65982, 'type': 'h'},
+    'QPSK2nd'           : {'offset': 65984, 'type': 'h'},
+    'ADTrigLocation'    : {'offset': 65986, 'type': 'h'},
+    'EXTTRIG'           : {'offset': 65988, 'type': 'h'},
+    'BlankIsLoopTime'   : {'offset': 65990, 'type': 'h'},
+    'UseComb'           : {'offset': 65992, 'type': 'h'},
+    'QPSKRX'            : {'offset': 65994, 'type': 'h'},
+    'mDate'             : {'offset': 65996, 'type': '20c'},
+    'mTime'             : {'offset': 66026, 'type': '30c'},
+    'real'              : {'offset': 66056, 'type': 'd'},
+    'mTitle'            : {'offset': 66064, 'type': '32c'},
+    'wavesize'          : {'offset': 66096, 'type': 'i'}
 }
 
 #測定データのヘッダー(10バイト,2バイトずつ)
@@ -117,18 +115,22 @@ class raw:
 
         #others
         self.inte = 0.0
-        self.variable = []
         self.field = 0.0
         self.temp = 0.0
-        self.XYZ = []
+        self.X = 0.0
+        self.Y = 0.0
+        self.Z = 0.0
         self.real = 0.0
+
+        #variable
+        self.variable = []
 
         #メタデータ
         self.mDate = "" #測定日
         self.mTime = "" #測定時刻
         self.mTitle = "" #タイトル
 
-    #積算回数sigmaで信号のデータを割り算して正規化
+    #積算回数sigmaで信号データを割り算して正規化
     #cosの正規化
     def normalize_cos(self):
         normalized_cos = self.cos / self.sigma
@@ -140,7 +142,8 @@ class raw:
         return normalized_sin
 
     def main(self):
-        main_list = {"積算回数":self.sigma,"サンプリング周期(cos)":self.dt0,"サンプリング周期(sin)":self.dt1,"Frequency":self.Frec,"OUTPUT LEVEL":self.TXLVL,"GAIN":self.GAIN,"LPF [Hz]":self.LPF1,"Phase":self.Phas,"サンプリング数":self.wavesize}
+        main_list = {"積算回数":self.sigma,"サンプリング周期(cos)":self.dt0,"サンプリング周期(sin)":self.dt1,"Frequency":self.Frec,"OUTPUT LEVEL":self.TXLVL,
+                    "GAIN":self.GAIN,"LPF [Hz]":self.LPF1,"Phase":self.Phas,"サンプリング数":self.wavesize}
         return main_list
 
     def modulator(self):
@@ -148,12 +151,20 @@ class raw:
         return modulator_list
 
     def T1T2info(self):
-        T1T2info_list = {"isDouble":self.isDouble,"blank":self.blank,"cpn":self.cpn}
-        return
+        T1T2info_list = {"isDouble":self.isDouble,"blank":self.blank,"cpn":self.cpn,"cpw":self.cpw,"cpi":self.cpi,"fpw":self.fpw,"spw":self.spw,"tJ":self.tJ,
+                        "t2":self.t2,"ADOFF":self.ADOFF,"Reserve1":self.Reserve1,"OSCILLO":self.OSCILLO,"PowLevel":self.PowLevel,"QPSKComb":self.QPSKComb,
+                        "QPSK1st":self.QPSK1st,"QPSK2nd":self.QPSK2nd,"ADTrigLocation":self.ADTrigLocation,"EXTTRIG":self.EXTTRIG,"BlankIsLoopTime":self.BlankIsLoopTime,
+                        "UseComb":self.UseComb,"QPSKRX":self.QPSKRX}
+        return T1T2info_list
 
     def others(self):
-        others_list = {"inte":self.inte}
-        return
+        others_list = {"inte":self.inte,"field":self.field,"temp":self.temp,"X":self.X,"Y":self.Y,"Z":self.Z,"real":self.real}
+        return others_list
+
+    #これだけリストで返すので注意
+    def var(self):
+        variable_list = self.variable
+        return variable_list
 
     def meta(self):
         meta_list = {"測定日":self.mDate,"測定時刻":self.mTime,"タイトル":self.mTitle}
@@ -221,8 +232,6 @@ def phase_shift(fft_result,n,base_angle = np.pi / 100):
 
 #自動位相調整(base_angleを単位として位相変化)
 def auto_const(fft_result,base_angle = np.pi / 100):
-    #実部を取り出し
-    real_part = fft_result.real
     #位相の変化一覧を作っておく
     phase_list = np.arange(-np.pi/2 ,np.pi/2,base_angle)
     #積分値を入れるリストを作っておく
@@ -250,51 +259,115 @@ if __name__ == "__main__":
     # モジュールとしてインポートされた場合は実行されない(テストに用いる)
     # __name__にはメインスクリプトとして実行された場合は__main__、モジュールとしてインポートされた場合はファイル名が代入される
 
-    #変数の定義
-    zeropoint = 1400 #ゼロポイント
-    n_ind= 3441 #切り取り範囲(負)
-    p_ind = 4752 #切り取り範囲(正)
-    base_angle = np.pi / 100 #基本の位相回転角(フーリエ変換ver2.5参照)　optionで選択できるようにするかも
+    def save_excel(file_path):
+        import sys #システム諸々で使用します
+        import openpyxl  as opx #エクセルの書き込みに使用
+        from openpyxl.styles import Font, PatternFill
+
+        #変数の定義
+        zeropoint = 1400 #ゼロポイント
+        n_ind= 3441 #切り取り範囲(負)
+        p_ind = 4752 #切り取り範囲(正)
+        base_angle = np.pi / 100 #基本の位相回転角(フーリエ変換ver2.5参照)　optionで選択できるようにするかも
+
+        #-------------実行部分---------------------
+
+        #データの読み込み
+        raw_data = import_rawdata(file_path)
+
+        #周波数軸を生成
+        freq_column= raw_data.calc_freq()
+        #FFT実行
+        (fft_re,fft_im,fft_result) = raw_data.FFT(zeropoint)
+
+        #位相自動調整
+        (shifted_re,shifted_im,_)= auto_const(fft_result)
+
+
+        #-------------エクセルに書き込み---------------------
+
+        wb = opx.Workbook() # workbookの作成
+        ws = wb.worksheets[0]
+
+        cell = ws.cell(row=1, column=1, value="Frequency [kHz]")
+        cell.fill = PatternFill("solid", fgColor="1F497D")
+        cell.font = Font(color="FFFFFF", bold=True)
+        for i,v in enumerate(freq_column[n_ind:p_ind],start=1):
+            ws.cell(row=i+1, column=1, value=v)
+
+        cell = ws.cell(row=1, column=2, value="Real")
+        cell.fill = PatternFill("solid", fgColor="1F497D")
+        cell.font = Font(color="FFFFFF", bold=True)
+        for i,v in enumerate(fft_re[n_ind:p_ind],start=1):
+            ws.cell(row=i+1, column=2, value=v)
+
+        cell = ws.cell(row=1, column=3, value="Image")
+        cell.fill = PatternFill("solid", fgColor="1F497D")
+        cell.font = Font(color="FFFFFF", bold=True)
+        for i,v in enumerate(fft_im[n_ind:p_ind],start=1):
+            ws.cell(row=i+1, column=3, value=v)
+
+        cell = ws.cell(row=1, column=4, value="shifted_Real")
+        cell.fill = PatternFill("solid", fgColor="1F497D")
+        cell.font = Font(color="FFFFFF", bold=True)
+        for i,v in enumerate(shifted_re[n_ind:p_ind],start=1):
+            ws.cell(row=i+1, column=4, value=v)
+
+        cell = ws.cell(row=1, column=5, value="shifted_Image")
+        cell.fill = PatternFill("solid", fgColor="1F497D")
+        cell.font = Font(color="FFFFFF", bold=True)
+        for i,v in enumerate(shifted_im[n_ind:p_ind],start=1):
+            ws.cell(row=i+1, column=5, value=v)
+
+        cell = ws.cell(row=1, column=6, value="main")
+        cell.fill = PatternFill("solid", fgColor="C0504D")
+        cell.font = Font(color="FFFFFF", bold=True)
+        for i,(key,value) in enumerate(raw_data.main().items(),start=1):
+            ws.cell(row=2*i, column=6, value=key)
+            ws.cell(row=2*i+1, column=6, value=value)
+
+        cell = ws.cell(row=1, column=7, value="modulator")
+        cell.fill = PatternFill("solid", fgColor="C0504D")
+        cell.font = Font(color="FFFFFF", bold=True)
+        for i,(key,value) in enumerate(raw_data.modulator().items(),start=1):
+            ws.cell(row=2*i, column=7, value=key)
+            ws.cell(row=2*i+1, column=7, value=value)
+
+        cell = ws.cell(row=1, column=8, value="T1T1info")
+        cell.fill = PatternFill("solid", fgColor="C0504D")
+        cell.font = Font(color="FFFFFF", bold=True)
+        for i,(key,value) in enumerate(raw_data.T1T2info().items(),start=1):
+            ws.cell(row=2*i, column=8, value=key)
+            ws.cell(row=2*i+1, column=8, value=value)
+
+        cell = ws.cell(row=1, column=9, value="others")
+        cell.fill = PatternFill("solid", fgColor="C0504D")
+        cell.font = Font(color="FFFFFF", bold=True)
+        for i,(key,value) in enumerate(raw_data.others().items(),start=1):
+            ws.cell(row=2*i, column=9, value=key)
+            ws.cell(row=2*i+1, column=9, value=value)
+
+        cell = ws.cell(row=1, column=10, value="variable")
+        cell.fill = PatternFill("solid", fgColor="C0504D")
+        cell.font = Font(color="FFFFFF", bold=True)
+        for i,v in enumerate(raw_data.var(),start=1):
+            ws.cell(row=i+1, column=10, value=v)
+
+        cell = ws.cell(row=1, column=11, value="meta_data")
+        cell.fill = PatternFill("solid", fgColor="C0504D")
+        cell.font = Font(color="FFFFFF", bold=True)
+        for i,(key,value) in enumerate(raw_data.meta().items(),start=1):
+            ws.cell(row=2*i, column=11, value=key)
+            ws.cell(row=2*i+1, column=11, value=value)
+
+        #列幅調整
+        column_width = {"A":16, "B":14, "C":14, "D":14, "E":14, "F":19.5, "G":11, "H":15, "I":13, "J":9, "K":35}
+
+        for column , width in column_width.items():
+            ws.column_dimensions[column].width = width
+
+        ws.title = (file_path) # シート名の変更
+        wb.save("fft_shift.xlsx") # Excelファイルの保存
+
     file_path = '10k0613T2F.1010'
-
-    #-------------実行部分---------------------
-
-    #データの読み込み
-    raw_data = import_rawdata(file_path)
-
-    #周波数軸を生成
-    freq_column= raw_data.calc_freq()
-    #FFT実行
-    (fft_re,fft_im,fft_result) = raw_data.FFT(zeropoint)
-
-    #位相自動調整
-    (shifted_re,shifted_im,shifted_fft)= auto_const(fft_result)
-
-
-    #-------------エクセルに書き込み---------------------
-
-    wb = opx.Workbook() # workbookの作成
-    ws = wb.worksheets[0]
-
-    ws.cell(row=1, column=1, value="Frequency [kHz]")
-    for i,v in enumerate(freq_column[n_ind:p_ind],start=1):
-        ws.cell(row=i+1, column=1, value=v)
-
-    ws.cell(row=1, column=2, value="Real")
-    for i,v in enumerate(fft_re[n_ind:p_ind],start=1):
-        ws.cell(row=i+1, column=2, value=v)
-
-    ws.cell(row=1, column=3, value="Image")
-    for i,v in enumerate(fft_im[n_ind:p_ind],start=1):
-        ws.cell(row=i+1, column=3, value=v)
-
-    ws.cell(row=1, column=4, value="shifted_Real")
-    for i,v in enumerate(shifted_re[n_ind:p_ind],start=1):
-        ws.cell(row=i+1, column=4, value=v)
-
-    ws.cell(row=1, column=5, value="shifted_Image")
-    for i,v in enumerate(shifted_im[n_ind:p_ind],start=1):
-        ws.cell(row=i+1, column=5, value=v)
-
-
-    wb.save("fft_shift.xlsx") # Excelファイルの保存
+    save_excel(file_path)
