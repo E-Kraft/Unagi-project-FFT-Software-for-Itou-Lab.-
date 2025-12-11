@@ -149,7 +149,7 @@
      </layout>
     </item>
     <item row="1" column="1">
-     <layout class="QGridLayout" name="gridLayout_2" rowstretch="0,8,1" rowminimumheight="0,0,0">
+     <layout class="QGridLayout" name="gridLayout_2" rowstretch="0,8,1" columnstretch="4,5" rowminimumheight="0,0,0">
       <property name="sizeConstraint">
        <enum>QLayout::SizeConstraint::SetDefaultConstraint</enum>
       </property>
@@ -287,10 +287,22 @@
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
   <widget class="QDockWidget" name="dockWidget">
+   <property name="sizePolicy">
+    <sizepolicy hsizetype="Minimum" vsizetype="Preferred">
+     <horstretch>0</horstretch>
+     <verstretch>0</verstretch>
+    </sizepolicy>
+   </property>
    <property name="minimumSize">
     <size>
-     <width>274</width>
+     <width>220</width>
      <height>100</height>
+    </size>
+   </property>
+   <property name="maximumSize">
+    <size>
+     <width>220</width>
+     <height>524287</height>
     </size>
    </property>
    <property name="floating">
