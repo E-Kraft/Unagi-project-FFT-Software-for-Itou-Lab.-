@@ -197,6 +197,15 @@ class raw:
         freq_column = np.fft.fftshift(freq_column)
         return freq_column
 
+def header_check(path):
+    with open(path,'rb') as f:
+        data = f.read()
+        header = np.array(struct.unpack_from('5h',data,0))
+        if all(header == check_header):
+            return True
+        else:
+            return False
+
 #生データをrawクラスのインスタンスとしてインポート
 def import_rawdata(path):
     try:

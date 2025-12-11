@@ -1,6 +1,8 @@
 import sys
+import os
 import numpy as np
-from PySide6.QtWidgets import QApplication, QMainWindow
+from PySide6.QtCore import Qt, QSize
+from PySide6.QtWidgets import QApplication, QMainWindow, QFileDialog, QListWidgetItem
 from PySide6.QtUiTools import loadUiType
 import pyqtgraph as pg
 from qt_material import apply_stylesheet
@@ -10,10 +12,8 @@ from datetime import datetime
 
 
 
+
 Ui_MainWindow, _ = loadUiType("graphui.ui")
-
-
-
 class MainWindow(QMainWindow, Ui_MainWindow):
     def __init__(self):
         super().__init__()
@@ -29,17 +29,22 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         """)
         self.statusBar().showMessage("準備完了")
 
-        # UIの PlotWidget（objectName="plot_widget"）
+        # widget取得
         self.plotWidget_sin = self.plot_widget_sin
         self.plotWidget_cos = self.plot_widget_cos
         self.plotWidget_pow = self.plot_widget_pow
+        self.refer = self.button_widget_refer
+
+        self.list_import = self.list_View_import
+        self.list_import.setIconSize(QSize(0, 0))
+
 
         #UIの lebel
         #self.label_sin = self.label_widget_sin
         #self.label_sin.setScaledContents(True)
         #画像配置
 
-        #log
+        #logの設定
         # 現在の日時を取得
         now= datetime.now()
         self.text_log = self.textBrowser_widget_log
@@ -54,27 +59,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         base_angle = np.pi / 100 #基本の位相回転角(フーリエ変換ver2.5参照)　optionで選択できるようにするかも
         file_path = '10k0613T2F.1010'
 
-        #-------------実行部分---------------------
-
-        #データの読み込み
-        raw_data = NMR.import_rawdata(file_path)
-
-        self.xs = np.arange(raw_data.wavesize)
-        self.ys = raw_data.normalize_sin()
-        self.yc = raw_data.normalize_cos()
-        self.yp = np.sqrt(self.ys**2+self.yc**2)
-
-
-        # --- 表示 ---
-        self.plotWidget_sin.plot(self.xs, self.ys, pen='k')
+        # --------------------------- 表示 -----------------------------------------------------------------
         self.plotWidget_sin.setTitle("<span style='color:black'>SIN</span>")
         self.plotWidget_sin.setBackground("#FFFFFF00")
-
-        self.plotWidget_cos.plot(self.xs, self.yc, pen='k')
         self.plotWidget_cos.setTitle("<span style='color:black'>COS</span>")
         self.plotWidget_cos.setBackground("#FFFFFF00")
-
-        self.plotWidget_pow.plot(self.xs, self.yp, pen='k')
         self.plotWidget_pow.setTitle("<span style='color:black'>S^2+c^2</span>")
         self.plotWidget_pow.setBackground("#FFFFFF00")
 
@@ -82,12 +71,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         vbc = self.plotWidget_cos.getViewBox()
         vbp = self.plotWidget_pow.getViewBox()
 
-        vbs.setLimits(xMin=0, xMax=raw_data.wavesize)
-        vbc.setLimits(xMin=0, xMax=raw_data.wavesize)
-        vbp.setLimits(xMin=0, xMax=raw_data.wavesize)
-        vbs.setRange(xRange=(0,raw_data.wavesize/2), yRange=(-1, 1))
-        vbc.setRange(xRange=(0, raw_data.wavesize/2), yRange=(-1, 1))
-        vbp.setRange(xRange=(0, raw_data.wavesize/2), yRange=(-1, 1))
+        vbs.setLimits(xMin=0, xMax=8192)
+        vbc.setLimits(xMin=0, xMax=8192)
+        vbp.setLimits(xMin=0, xMax=8192)
+        vbs.setRange(xRange=(0,8192/2), yRange=(-1, 1))
+        vbc.setRange(xRange=(0, 8192/2), yRange=(-1, 1))
+        vbp.setRange(xRange=(0, 8192/2), yRange=(-1, 1))
         vbs.setMouseEnabled(y=False,x=True)
         vbc.setMouseEnabled(y=False,x=True)
         vbp.setMouseEnabled(y=False,x=True)
@@ -96,6 +85,99 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.plotWidget_pow.setXLink(self.plotWidget_sin)
         self.plotWidget_cos.setYLink(self.plotWidget_sin)
         self.plotWidget_pow.setYLink(self.plotWidget_sin)
+
+        # --- クリック検出 ---
+        self.refer.clicked.connect(self.select_folder) #　参照ボタン　to　エクスプローラーを開く関数
+        self.plotWidget_sin.scene().sigMouseClicked.connect(self.onClick)
+        self.plotWidget_cos.scene().sigMouseClicked.connect(self.onClick)
+        self.plotWidget_pow.scene().sigMouseClicked.connect(self.onClick)
+        self.list_import.itemClicked.connect(self.filename_clicked) # ファイルリストクリック to グラフ表示
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#-------------実行部分-------------------------------------------------------------------------------------------------------------------------------------------------------
+
+    def select_folder(self):
+        #入力フォルダー選択
+        folder = QFileDialog.getExistingDirectory(self, "フォルダ選択")
+        if folder:
+            self.statusBar().showMessage(folder)
+        if not folder:
+            return
+
+        self.list_import.clear()
+        self.load_files(folder)
+
+
+    def load_files(self, folder):
+        self.statusBar().showMessage("読み込み中")
+        # 直下のファイル
+        for name in os.listdir(folder):
+            full = os.path.join(folder, name)
+            if os.path.isfile(full):
+                if NMR.header_check(full) == True:
+                    self.add_checked_item(name,full)
+
+        # 1階層下のファイル
+        for name in os.listdir(folder):
+            full = os.path.join(folder, name)
+            if os.path.isdir(full):
+                for sub in os.listdir(full):
+                    sub_full = os.path.join(full, sub)
+                    if os.path.isfile(sub_full):
+                        if NMR.header_check(sub_full) == True:
+                            self.add_checked_item(sub,sub_full)
+        self.statusBar().showMessage("読み込み完了:"+folder)
+
+    def add_checked_item(self, sub, fullpath):
+        item = QListWidgetItem(sub)
+        item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+        item.setCheckState(Qt.Checked)
+        item.setData(Qt.UserRole,fullpath)
+        self.list_import.addItem(item)
+
+
+    def filename_clicked(self, item):
+        clicked_path = item.data(Qt.UserRole)
+        #データの読み込み
+        raw_data = NMR.import_rawdata(clicked_path)
+
+        self.plotWidget_sin.clear()
+        self.plotWidget_cos.clear()
+        self.plotWidget_pow.clear()
+
+        self.xs = np.arange(raw_data.wavesize)
+        self.ys = raw_data.normalize_sin()
+        self.yc = raw_data.normalize_cos()
+        self.yp = np.sqrt(self.ys**2+self.yc**2)
+
+        self.plotWidget_sin.plot(self.xs, self.ys, pen='k')
+        self.plotWidget_cos.plot(self.xs, self.yc, pen='k')
+        self.plotWidget_pow.plot(self.xs, self.yp, pen='k')
+
 
         # --- 縦ライン ---
         self.vline_sin = pg.InfiniteLine(angle=90, movable=False,pen=pg.mkPen('r', width=2))
@@ -108,10 +190,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.vline_cos.hide()
         self.vline_pow.hide()
 
-        # --- クリック検出 ---
-        self.plotWidget_sin.scene().sigMouseClicked.connect(self.onClick)
-        self.plotWidget_cos.scene().sigMouseClicked.connect(self.onClick)
-        self.plotWidget_pow.scene().sigMouseClicked.connect(self.onClick)
 
     def onClick(self, event):
         pos = event.scenePos()
@@ -172,11 +250,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.vline_pow.show()
 
             self.statusBar().showMessage(f"clicked \"pow\" at x={nearest_x}, y={nearest_y:.4f}")
-
-
-
-
-
 
 
 
