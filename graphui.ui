@@ -7,8 +7,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1080</width>
-    <height>740</height>
+    <width>973</width>
+    <height>700</height>
    </rect>
   </property>
   <property name="font">
@@ -22,8 +22,18 @@
   <property name="windowTitle">
    <string>フーリエ変換 ver3.0β</string>
   </property>
+  <property name="windowIcon">
+   <iconset>
+    <normaloff>icon.png</normaloff>icon.png</iconset>
+  </property>
   <property name="whatsThis">
    <string/>
+  </property>
+  <property name="iconSize">
+   <size>
+    <width>32</width>
+    <height>32</height>
+   </size>
   </property>
   <property name="toolButtonStyle">
    <enum>Qt::ToolButtonStyle::ToolButtonIconOnly</enum>
@@ -42,7 +52,7 @@
        <enum>QLayout::SizeConstraint::SetDefaultConstraint</enum>
       </property>
       <item row="4" column="0">
-       <widget class="PlotWidget" name="plot_widget_pow">
+       <widget class="PlotWidget" name="plot_widget_norm">
         <property name="sizePolicy">
          <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
           <horstretch>0</horstretch>
@@ -100,7 +110,7 @@
        <enum>QLayout::SizeConstraint::SetDefaultConstraint</enum>
       </property>
       <item row="0" column="0">
-       <widget class="QLabel" name="label">
+       <widget class="QLabel" name="label_path">
         <property name="font">
          <font>
           <family>メイリオ</family>
@@ -117,12 +127,15 @@
        </widget>
       </item>
       <item row="1" column="0">
-       <widget class="QLineEdit" name="lineEdit">
+       <widget class="QLineEdit" name="lineEdit_path">
         <property name="sizePolicy">
          <sizepolicy hsizetype="Expanding" vsizetype="Minimum">
           <horstretch>2</horstretch>
           <verstretch>0</verstretch>
          </sizepolicy>
+        </property>
+        <property name="readOnly">
+         <bool>true</bool>
         </property>
        </widget>
       </item>
@@ -149,22 +162,12 @@
      </layout>
     </item>
     <item row="1" column="1">
-     <layout class="QGridLayout" name="gridLayout_2" rowstretch="0,8,1" columnstretch="4,5" rowminimumheight="0,0,0">
+     <layout class="QGridLayout" name="gridLayout_2" rowstretch="0,8,0,1" columnstretch="4,2,1,1" rowminimumheight="0,0,0,0">
       <property name="sizeConstraint">
        <enum>QLayout::SizeConstraint::SetDefaultConstraint</enum>
       </property>
-      <item row="1" column="0">
-       <widget class="QTreeView" name="treeView">
-        <property name="sizePolicy">
-         <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
-          <horstretch>1</horstretch>
-          <verstretch>0</verstretch>
-         </sizepolicy>
-        </property>
-       </widget>
-      </item>
-      <item row="2" column="0">
-       <widget class="QPushButton" name="pushButton">
+      <item row="3" column="0">
+       <widget class="QPushButton" name="pushButton_raw">
         <property name="sizePolicy">
          <sizepolicy hsizetype="Expanding" vsizetype="MinimumExpanding">
           <horstretch>0</horstretch>
@@ -176,8 +179,36 @@
         </property>
        </widget>
       </item>
-      <item row="2" column="1">
-       <widget class="QPushButton" name="pushButton_2">
+      <item row="1" column="1" colspan="3">
+       <widget class="FolderDropListWidget" name="list_View_import">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="minimumSize">
+         <size>
+          <width>80</width>
+          <height>0</height>
+         </size>
+        </property>
+        <property name="acceptDrops">
+         <bool>true</bool>
+        </property>
+        <property name="accessibleDescription">
+         <string/>
+        </property>
+        <property name="alternatingRowColors">
+         <bool>false</bool>
+        </property>
+        <property name="selectionMode">
+         <enum>QAbstractItemView::SelectionMode::SingleSelection</enum>
+        </property>
+       </widget>
+      </item>
+      <item row="3" column="1" colspan="3">
+       <widget class="QPushButton" name="pushButton_fft">
         <property name="sizePolicy">
          <sizepolicy hsizetype="Expanding" vsizetype="MinimumExpanding">
           <horstretch>0</horstretch>
@@ -189,11 +220,49 @@
         </property>
        </widget>
       </item>
-      <item row="0" column="1">
-       <widget class="QComboBox" name="comboBox"/>
+      <item row="2" column="0">
+       <widget class="QComboBox" name="comboBox_export">
+        <item>
+         <property name="text">
+          <string>csv</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>エクセル(個別ファイル)</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>エクセル(単一ファイル)</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>エクセル(単一シート)</string>
+         </property>
+        </item>
+       </widget>
+      </item>
+      <item row="2" column="1">
+       <widget class="QPushButton" name="pushButton_allselect">
+        <property name="text">
+         <string>全選択</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="1" colspan="3">
+       <widget class="QComboBox" name="comboBox_sort"/>
+      </item>
+      <item row="2" column="3">
+       <widget class="QPushButton" name="pushButton_next">
+        <property name="text">
+         <string>次</string>
+        </property>
+       </widget>
       </item>
       <item row="0" column="0">
-       <widget class="QLabel" name="label_2">
+       <widget class="QLabel" name="label_sort">
         <property name="font">
          <font>
           <family>メイリオ</family>
@@ -212,22 +281,20 @@
         </property>
        </widget>
       </item>
-      <item row="1" column="1">
-       <widget class="QListWidget" name="list_View_import">
+      <item row="2" column="2">
+       <widget class="QPushButton" name="pushButton_before">
+        <property name="text">
+         <string>前</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="0">
+       <widget class="QTreeWidget" name="treeWidget_data">
         <property name="sizePolicy">
          <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
-          <horstretch>1</horstretch>
+          <horstretch>0</horstretch>
           <verstretch>0</verstretch>
          </sizepolicy>
-        </property>
-        <property name="minimumSize">
-         <size>
-          <width>100</width>
-          <height>0</height>
-         </size>
-        </property>
-        <property name="acceptDrops">
-         <bool>true</bool>
         </property>
        </widget>
       </item>
@@ -240,7 +307,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1080</width>
+     <width>973</width>
      <height>33</height>
     </rect>
    </property>
@@ -254,38 +321,57 @@
     <property name="title">
      <string>ファイル</string>
     </property>
-    <addaction name="actionsdsd"/>
-    <addaction name="actionsdsd_2"/>
+    <addaction name="action_read"/>
+    <addaction name="action_recent"/>
     <addaction name="separator"/>
-    <addaction name="action_5"/>
+    <addaction name="action_exit"/>
    </widget>
    <widget class="QMenu" name="menu">
     <property name="title">
-     <string>設定</string>
+     <string>高度な設定</string>
     </property>
-    <addaction name="action_6"/>
-    <addaction name="action_7"/>
+    <addaction name="action_zeropad"/>
+    <addaction name="action_windowfunc"/>
+    <addaction name="action_angle"/>
    </widget>
    <widget class="QMenu" name="menu_widget_help">
     <property name="title">
      <string>ヘルプ</string>
     </property>
-    <addaction name="action_3"/>
+    <addaction name="action_thisapp"/>
+    <addaction name="action_ver"/>
+    <addaction name="action_GitHub"/>
    </widget>
    <widget class="QMenu" name="menu_3">
     <property name="title">
      <string>表示</string>
     </property>
-    <addaction name="action"/>
+    <widget class="QMenu" name="menu_2">
+     <property name="font">
+      <font>
+       <family>メイリオ</family>
+      </font>
+     </property>
+     <property name="title">
+      <string>テーマ</string>
+     </property>
+     <addaction name="action_light"/>
+     <addaction name="action_dark"/>
+    </widget>
+    <addaction name="action_lighttheme"/>
     <addaction name="separator"/>
-    <addaction name="action_2"/>
+    <addaction name="menu_2"/>
    </widget>
    <addaction name="menu_widget_file"/>
    <addaction name="menu_3"/>
    <addaction name="menu"/>
    <addaction name="menu_widget_help"/>
   </widget>
-  <widget class="QStatusBar" name="statusbar"/>
+  <widget class="QStatusBar" name="statusbar">
+   <property name="whatsThis">
+    <string/>
+   </property>
+  </widget>
   <widget class="QDockWidget" name="dockWidget">
    <property name="sizePolicy">
     <sizepolicy hsizetype="Minimum" vsizetype="Preferred">
@@ -296,7 +382,7 @@
    <property name="minimumSize">
     <size>
      <width>220</width>
-     <height>100</height>
+     <height>500</height>
     </size>
    </property>
    <property name="maximumSize">
@@ -305,8 +391,11 @@
      <height>524287</height>
     </size>
    </property>
+   <property name="cursor">
+    <cursorShape>IBeamCursor</cursorShape>
+   </property>
    <property name="floating">
-    <bool>false</bool>
+    <bool>true</bool>
    </property>
    <property name="features">
     <set>QDockWidget::DockWidgetFeature::DockWidgetFloatable|QDockWidget::DockWidgetFeature::DockWidgetMovable</set>
@@ -335,17 +424,17 @@
     </layout>
    </widget>
   </widget>
-  <action name="actionsdsd">
+  <action name="action_read">
    <property name="text">
     <string>読み込み</string>
    </property>
   </action>
-  <action name="actionsdsd_2">
+  <action name="action_recent">
    <property name="text">
-    <string>sdsd</string>
+    <string>最近使用したファイル</string>
    </property>
   </action>
-  <action name="action">
+  <action name="action_lighttheme">
    <property name="checkable">
     <bool>true</bool>
    </property>
@@ -353,7 +442,7 @@
     <bool>true</bool>
    </property>
    <property name="text">
-    <string>ライトモード</string>
+    <string>ログの表示</string>
    </property>
    <property name="font">
     <font>
@@ -361,7 +450,7 @@
     </font>
    </property>
   </action>
-  <action name="action_2">
+  <action name="action_darktheme">
    <property name="checkable">
     <bool>true</bool>
    </property>
@@ -374,7 +463,7 @@
     </font>
    </property>
   </action>
-  <action name="action_3">
+  <action name="action_thisapp">
    <property name="text">
     <string>このアプリについて</string>
    </property>
@@ -384,12 +473,12 @@
     </font>
    </property>
   </action>
-  <action name="action_5">
+  <action name="action_exit">
    <property name="text">
     <string>終了</string>
    </property>
   </action>
-  <action name="action_6">
+  <action name="action_zeropad">
    <property name="text">
     <string>ゼロパディング</string>
    </property>
@@ -399,9 +488,54 @@
     </font>
    </property>
   </action>
-  <action name="action_7">
+  <action name="action_windowfunc">
    <property name="text">
     <string>窓関数</string>
+   </property>
+  </action>
+  <action name="action_angle">
+   <property name="text">
+    <string>単位位相角</string>
+   </property>
+  </action>
+  <action name="action_GitHub">
+   <property name="text">
+    <string>GitHub</string>
+   </property>
+  </action>
+  <action name="action_ver">
+   <property name="text">
+    <string>バージョン履歴</string>
+   </property>
+  </action>
+  <action name="action_light">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>ライトモード</string>
+   </property>
+   <property name="font">
+    <font>
+     <family>メイリオ</family>
+     <bold>false</bold>
+    </font>
+   </property>
+  </action>
+  <action name="action_dark">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>ダークモード</string>
+   </property>
+   <property name="font">
+    <font>
+     <family>メイリオ</family>
+    </font>
    </property>
   </action>
  </widget>
@@ -410,6 +544,11 @@
    <class>PlotWidget</class>
    <extends>QGraphicsView</extends>
    <header location="global">pyqtgraph</header>
+  </customwidget>
+  <customwidget>
+   <class>FolderDropListWidget</class>
+   <extends>QListWidget</extends>
+   <header location="global">placeholder_listwidget</header>
   </customwidget>
  </customwidgets>
  <resources/>

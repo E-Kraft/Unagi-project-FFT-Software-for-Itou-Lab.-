@@ -1,23 +1,72 @@
 import sys
 import os
 import numpy as np
-from PySide6.QtCore import Qt, QSize
-from PySide6.QtWidgets import QApplication, QMainWindow, QFileDialog, QListWidgetItem
+from PySide6.QtCore import Qt, QSize, QSettings, QUrl, QObject, Signal, qInstallMessageHandler, QtMsgType, qWarning
+from PySide6.QtGui import QDesktopServices
+from PySide6.QtWidgets import QApplication, QMainWindow, QFileDialog, QListWidgetItem, QTreeWidgetItem
 from PySide6.QtUiTools import loadUiType
 import pyqtgraph as pg
 from qt_material import apply_stylesheet
 import NMR
 from datetime import datetime
-
-
-
-
-
+# --- 初期設定 ---
+settings = QSettings("FFTver3_series", "FFTver3.0")
+pg.setConfigOptions(useOpenGL=True)
+pg.setConfigOption('foreground', 'k')
 Ui_MainWindow, _ = loadUiType("graphui.ui")
+
+#コンソールの内容を受け取るクラス
+#デバッグモード用
+class StdoutRedirect:
+    def __init__(self, widget):
+        self.widget = widget
+
+    def write(self, text):
+        if text.strip():
+            now= datetime.now()
+            self.widget.appendPlainText("")
+            self.widget.appendPlainText(f"・{now.year}/{now.month}/{now.day} {now.hour}:{now.minute}:{now.second}")
+            self.widget.appendPlainText(text)
+
+    def flush(self):
+        pass
+def qt_message_handler(mode, context, message):
+    # ここでは print するだけ
+    print(message)
+
+
+
+
+
+
+
+
+
+
+
 class MainWindow(QMainWindow, Ui_MainWindow):
     def __init__(self):
         super().__init__()
         self.setupUi(self)
+        self.text_log = self.textBrowser_widget_log
+        #logの設定
+        # 現在の日時を取得
+        now= datetime.now()
+        self.text_log.setPlainText(f"・{now.year}/{now.month}/{now.day} {now.hour}:{now.minute}:{now.second}")
+        self.text_log.appendPlainText("フーリエ変換ver3.0 起動")
+
+#デバッグ用-----------------------------------------------------------------------------------------------------------------------------------
+        # stdout / stderr を UI に流す
+        sys.stdout = StdoutRedirect(self.text_log)
+        sys.stderr = StdoutRedirect(self.text_log)
+
+        # 動作確認用
+        print("Debug Mode Start!!")
+
+
+#--------------------------------------------------------------------------------------------------------------------------------------------
+
+
         #ステータスバーの設定
         self.statusBar().setStyleSheet("""
         QStatusBar{
@@ -32,11 +81,18 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         # widget取得
         self.plotWidget_sin = self.plot_widget_sin
         self.plotWidget_cos = self.plot_widget_cos
-        self.plotWidget_pow = self.plot_widget_pow
+        self.plotWidget_norm = self.plot_widget_norm
         self.refer = self.button_widget_refer
-
+        self.path_text = self.lineEdit_path
+        self.button_select = self.pushButton_allselect
+        self.button_next = self.pushButton_next
+        self.button_before = self.pushButton_before
         self.list_import = self.list_View_import
         self.list_import.setIconSize(QSize(0, 0))
+        self.button_git = self.action_GitHub
+        self.list_data = self.treeWidget_data
+        self.list_data.setHeaderLabels(["内部データ"])
+
 
 
         #UIの lebel
@@ -44,12 +100,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         #self.label_sin.setScaledContents(True)
         #画像配置
 
-        #logの設定
-        # 現在の日時を取得
-        now= datetime.now()
-        self.text_log = self.textBrowser_widget_log
-        self.text_log.setPlainText(f"・{now.year}/{now.month}/{now.day} {now.hour}:{now.minute}:{now.second}")
-        self.text_log.appendPlainText("フーリエ変換ver3.0 起動")
+
 
         # --- データ作成 ---
         #変数の定義
@@ -60,52 +111,59 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         file_path = '10k0613T2F.1010'
 
         # --------------------------- 表示 -----------------------------------------------------------------
-        self.plotWidget_sin.setTitle("<span style='color:black'>SIN</span>")
+        self.plotWidget_sin.setLabel('left',"SIN",    **{'font-size': '12pt', 'color': 'k'})
         self.plotWidget_sin.setBackground("#FFFFFF00")
-        self.plotWidget_cos.setTitle("<span style='color:black'>COS</span>")
+        self.plotWidget_sin.hideButtons()
+        self.plotWidget_cos.setLabel('left',"COS",    **{'font-size': '12pt', 'color': 'k'})
         self.plotWidget_cos.setBackground("#FFFFFF00")
-        self.plotWidget_pow.setTitle("<span style='color:black'>S^2+c^2</span>")
-        self.plotWidget_pow.setBackground("#FFFFFF00")
+        self.plotWidget_cos.hideButtons()
+        self.plotWidget_norm.setLabel('left',"| f(t) |",    **{'font-size': '12pt', 'color': 'k'})
+        self.plotWidget_norm.setBackground("#FFFFFF00")
+        self.plotWidget_norm.hideButtons()
 
         vbs = self.plotWidget_sin.getViewBox()
         vbc = self.plotWidget_cos.getViewBox()
-        vbp = self.plotWidget_pow.getViewBox()
+        vbn = self.plotWidget_norm.getViewBox()
 
         vbs.setLimits(xMin=0, xMax=8192)
         vbc.setLimits(xMin=0, xMax=8192)
-        vbp.setLimits(xMin=0, xMax=8192)
-        vbs.setRange(xRange=(0,8192/2), yRange=(-1, 1))
+        vbn.setLimits(xMin=0, xMax=8192)
+        vbs.setRange(xRange=(0, 8192/2), yRange=(-1, 1))
         vbc.setRange(xRange=(0, 8192/2), yRange=(-1, 1))
-        vbp.setRange(xRange=(0, 8192/2), yRange=(-1, 1))
+        vbn.setRange(xRange=(0, 8192/2), yRange=(-1, 1))
         vbs.setMouseEnabled(y=False,x=True)
         vbc.setMouseEnabled(y=False,x=True)
-        vbp.setMouseEnabled(y=False,x=True)
+        vbn.setMouseEnabled(y=False,x=True)
+        vbs.setMenuEnabled(False)
+        vbc.setMenuEnabled(False)
+        vbn.setMenuEnabled(False)
+
+
 
         self.plotWidget_cos.setXLink(self.plotWidget_sin)
-        self.plotWidget_pow.setXLink(self.plotWidget_sin)
+        self.plotWidget_norm.setXLink(self.plotWidget_sin)
         self.plotWidget_cos.setYLink(self.plotWidget_sin)
-        self.plotWidget_pow.setYLink(self.plotWidget_sin)
+        self.plotWidget_norm.setYLink(self.plotWidget_sin)
 
         # --- クリック検出 ---
         self.refer.clicked.connect(self.select_folder) #　参照ボタン　to　エクスプローラーを開く関数
-        self.plotWidget_sin.scene().sigMouseClicked.connect(self.onClick)
-        self.plotWidget_cos.scene().sigMouseClicked.connect(self.onClick)
-        self.plotWidget_pow.scene().sigMouseClicked.connect(self.onClick)
-        self.list_import.itemClicked.connect(self.filename_clicked) # ファイルリストクリック to グラフ表示
+        #self.plotWidget_sin.scene().sigMouseClicked.connect(self.onClick)
+        #self.plotWidget_cos.scene().sigMouseClicked.connect(self.onClick)
+        #self.plotWidget_norm.scene().sigMouseClicked.connect(self.onClick)
+        #self.list_import.itemClicked.connect(self.filename_clicked) # ファイルリストクリック to グラフ表示
+        self.list_import.currentItemChanged.connect(self.filename_clicked)
+        self.button_select.clicked.connect(self.all_select)
+        self.button_next.clicked.connect(self.next)
+        self.button_before.clicked.connect(self.before)
+        self.button_git.triggered.connect(self.open_github)
 
+        # --- D&D検出 ---
+        self.list_import.filesDropped.connect(self.DandD)
 
-
-
-
-
-
-
-
-
-
-
-
-
+        # --- 前回の設定の読み込み ---
+        self.latest_folder = settings.value("paths/latest_folder")
+        if self.latest_folder:
+            self.load_files(settings.value("paths/latest_folder"))
 
 
 
@@ -129,10 +187,16 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             return
 
         self.list_import.clear()
+        settings.setValue("paths/latest_folder",folder)
         self.load_files(folder)
 
+    def DandD(self, paths):
+        path = paths[0] #先頭だけ表示
+        self.statusBar().showMessage(path)
+        self.load_files(path)
 
     def load_files(self, folder):
+        self.path_text.setText(folder)
         self.statusBar().showMessage("読み込み中")
         # 直下のファイル
         for name in os.listdir(folder):
@@ -159,15 +223,156 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         item.setData(Qt.UserRole,fullpath)
         self.list_import.addItem(item)
 
+    def all_select(self):
+        any_checked = False
+        for i in range(self.list_import.count()):
+            if self.list_import.item(i).checkState() == Qt.Checked:
+                any_checked = True
+                break
+
+        new_state = Qt.Unchecked if any_checked else Qt.Checked
+
+        for i in range(self.list_import.count()):
+            self.list_import.item(i).setCheckState(new_state)
+
+    def next(self):
+        row = self.list_import.currentRow()
+        count = self.list_import.count()
+
+        if count == 0:
+            return
+
+        if row < 0:
+            # 未選択なら先頭
+            next_row = 0
+        else:
+            # 最後なら 0 に戻す
+            next_row = (row + 1) % count
+
+        self.list_import.setCurrentRow(next_row)
+
+
+    def before(self):
+        row = self.list_import.currentRow()
+        count = self.list_import.count()
+
+        if count == 0:
+            return
+
+        if row < 0:
+            # 未選択なら先頭
+            next_row = 0
+        else:
+            # 最後なら 0 に戻す
+            next_row = (row - 1) % count
+
+        self.list_import.setCurrentRow(next_row)
 
     def filename_clicked(self, item):
         clicked_path = item.data(Qt.UserRole)
         #データの読み込み
         raw_data = NMR.import_rawdata(clicked_path)
 
+        #データをリストに表示
+        tree = self.list_data
+        tree.clear()
+
+        parent = QTreeWidgetItem(tree,["メインの情報"])
+
+        # 太字
+        font = parent.font(0)
+        font.setBold(True)
+        parent.setFont(0, font)
+
+        # 高さ（行間を少し広く）
+        parent.setSizeHint(0, QSize(0, 28))
+        for name,data in raw_data.main().items():
+            child_name = QTreeWidgetItem(parent, [name])
+            child_data = QTreeWidgetItem(parent, [str(data)])
+            child_name.setSizeHint(0, QSize(0, 18))
+            child_data.setSizeHint(0, QSize(0, 18))
+        parent.setExpanded(True)
+
+        parent = QTreeWidgetItem(tree,["meta情報"])
+
+        # 太字
+        font = parent.font(0)
+        font.setBold(True)
+        parent.setFont(0, font)
+
+        # 高さ（行間を少し広く）
+        parent.setSizeHint(0, QSize(0, 28))
+        for name,data in raw_data.meta().items():
+            child_name = QTreeWidgetItem(parent, [name])
+            child_data = QTreeWidgetItem(parent, [data])
+            child_name.setSizeHint(0, QSize(0, 18))
+            child_data.setSizeHint(0, QSize(0, 18))
+        parent.setExpanded(True)
+
+        parent = QTreeWidgetItem(tree,["モジュレーター情報"])
+
+        # 太字
+        font = parent.font(0)
+        font.setBold(True)
+        parent.setFont(0, font)
+
+        # 高さ（行間を少し広く）
+        parent.setSizeHint(0, QSize(0, 28))
+        for name,data in raw_data.modulator().items():
+            child_name = QTreeWidgetItem(parent, [name])
+            child_data = QTreeWidgetItem(parent, [str(data)])
+            child_name.setSizeHint(0, QSize(0, 18))
+            child_data.setSizeHint(0, QSize(0, 18))
+
+        parent = QTreeWidgetItem(tree,["T1T2info"])
+
+        # 太字
+        font = parent.font(0)
+        font.setBold(True)
+        parent.setFont(0, font)
+
+        # 高さ（行間を少し広く）
+        parent.setSizeHint(0, QSize(0, 28))
+        for name,data in raw_data.T1T2info().items():
+            child_name = QTreeWidgetItem(parent, [name])
+            child_data = QTreeWidgetItem(parent, [str(data)])
+            child_name.setSizeHint(0, QSize(0, 18))
+            child_data.setSizeHint(0, QSize(0, 18))
+
+        parent = QTreeWidgetItem(tree,["others"])
+
+        # 太字
+        font = parent.font(0)
+        font.setBold(True)
+        parent.setFont(0, font)
+
+        # 高さ（行間を少し広く）
+        parent.setSizeHint(0, QSize(0, 28))
+        for name,data in raw_data.others().items():
+            child_name = QTreeWidgetItem(parent, [name])
+            child_data = QTreeWidgetItem(parent, [str(data)])
+            child_name.setSizeHint(0, QSize(0, 18))
+            child_data.setSizeHint(0, QSize(0, 18))
+
+        parent = QTreeWidgetItem(tree,["variable"])
+
+        # 太字
+        font = parent.font(0)
+        font.setBold(True)
+        parent.setFont(0, font)
+
+        # 高さ（行間を少し広く）
+        parent.setSizeHint(0, QSize(0, 28))
+        for data in raw_data.var():
+            child_data = QTreeWidgetItem(parent, [str(data)])
+            child_data.setSizeHint(0, QSize(0, 18))
+
+
+        # --- グラフ設定 ---
+
         self.plotWidget_sin.clear()
         self.plotWidget_cos.clear()
-        self.plotWidget_pow.clear()
+        self.plotWidget_norm.clear()
 
         self.xs = np.arange(raw_data.wavesize)
         self.ys = raw_data.normalize_sin()
@@ -176,19 +381,25 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         self.plotWidget_sin.plot(self.xs, self.ys, pen='k')
         self.plotWidget_cos.plot(self.xs, self.yc, pen='k')
-        self.plotWidget_pow.plot(self.xs, self.yp, pen='k')
+        self.plotWidget_norm.plot(self.xs, self.yp, pen='k')
+
+        self.plotWidget_sin.showGrid(x=True, y=True, alpha=0.3)
+        self.plotWidget_cos.showGrid(x=True, y=True, alpha=0.3)
+        self.plotWidget_norm.showGrid(x=True, y=True, alpha=0.3)
+
+
 
 
         # --- 縦ライン ---
         self.vline_sin = pg.InfiniteLine(angle=90, movable=False,pen=pg.mkPen('r', width=2))
         self.vline_cos = pg.InfiniteLine(angle=90, movable=False,pen=pg.mkPen('r', width=2))
-        self.vline_pow = pg.InfiniteLine(angle=90, movable=False,pen=pg.mkPen('r', width=2))
+        self.vline_norm = pg.InfiniteLine(angle=90, movable=False,pen=pg.mkPen('r', width=2))
         self.plotWidget_sin.addItem(self.vline_sin)
         self.plotWidget_cos.addItem(self.vline_cos)
-        self.plotWidget_pow.addItem(self.vline_pow)
+        self.plotWidget_norm.addItem(self.vline_norm)
         self.vline_sin.hide()
         self.vline_cos.hide()
-        self.vline_pow.hide()
+        self.vline_norm.hide()
 
 
     def onClick(self, event):
@@ -208,8 +419,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.vline_sin.show()
             self.vline_cos.setValue(nearest_x)
             self.vline_cos.show()
-            self.vline_pow.setValue(nearest_x)
-            self.vline_pow.show()
+            self.vline_norm.setValue(nearest_x)
+            self.vline_norm.show()
 
             self.statusBar().showMessage(f"clicked \"sin\" at x={nearest_x}, y={nearest_y:.4f}")
 
@@ -227,13 +438,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.vline_sin.show()
             self.vline_cos.setValue(nearest_x)
             self.vline_cos.show()
-            self.vline_pow.setValue(nearest_x)
-            self.vline_pow.show()
+            self.vline_norm.setValue(nearest_x)
+            self.vline_norm.show()
 
             self.statusBar().showMessage(f"clicked \"cos\" at x={nearest_x}, y={nearest_y:.4f}")
 
-        elif self.plotWidget_pow.plotItem.sceneBoundingRect().contains(pos):
-            mouse_point = self.plotWidget_pow.plotItem.vb.mapSceneToView(pos)
+        elif self.plotWidget_norm.plotItem.sceneBoundingRect().contains(pos):
+            mouse_point = self.plotWidget_norm.plotItem.vb.mapSceneToView(pos)
             click_x = mouse_point.x()
 
             # 最近傍点の探索
@@ -246,10 +457,14 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.vline_sin.show()
             self.vline_cos.setValue(nearest_x)
             self.vline_cos.show()
-            self.vline_pow.setValue(nearest_x)
-            self.vline_pow.show()
+            self.vline_norm.setValue(nearest_x)
+            self.vline_norm.show()
 
-            self.statusBar().showMessage(f"clicked \"pow\" at x={nearest_x}, y={nearest_y:.4f}")
+            self.statusBar().showMessage(f"clicked \"norm\" at x={nearest_x}, y={nearest_y:.4f}")
+
+    def open_github(self):
+        url = QUrl("https://github.com/E-Kraft/Unagi-project-FFT-Software-for-Itou-Lab.-")
+        QDesktopServices.openUrl(url)
 
 
 
@@ -257,6 +472,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
+    qInstallMessageHandler(qt_message_handler)
     apply_stylesheet(app, theme='light_blue.xml',)
     #apply_stylesheet(app, theme='dark_blue.xml',)
     win = MainWindow()
