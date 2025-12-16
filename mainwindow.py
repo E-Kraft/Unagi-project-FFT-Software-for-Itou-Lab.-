@@ -1,7 +1,7 @@
 import sys
 import os
 import numpy as np
-from PySide6.QtCore import Qt, QSize, QSettings, QUrl, QObject, Signal, qInstallMessageHandler, QtMsgType, qWarning
+from PySide6.QtCore import Qt, QSize, QSettings, QUrl, QThread, QObject, Signal, qInstallMessageHandler, QtMsgType, qWarning, QTimer
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import QApplication, QMainWindow, QFileDialog, QListWidgetItem, QTreeWidgetItem
 from PySide6.QtUiTools import loadUiType
@@ -9,14 +9,16 @@ import pyqtgraph as pg
 from qt_material import apply_stylesheet
 import NMR
 from datetime import datetime
+
 # --- 初期設定 ---
-settings = QSettings("FFTver3_series", "FFTver3.0")
-pg.setConfigOptions(useOpenGL=True)
-pg.setConfigOption('foreground', 'k')
+settings = QSettings("FFTver3_series", "FFTver3.0") # アプリ終了後の設定保存用ファイル
+pg.setConfigOptions(useOpenGL=True) #　グラフの描画にOpenGLを利用して高速化
+pg.setConfigOption('foreground', 'k') #グラフを黒色に
 Ui_MainWindow, _ = loadUiType("graphui.ui")
 
+#デバッグモード用--------------------------------------------------------------------------------------------------------------------------------------
+#使用する場合はqInstallMessageHandler(qt_message_handler)とstdout / stderrのコメントをオフに
 #コンソールの内容を受け取るクラス
-#デバッグモード用
 class StdoutRedirect:
     def __init__(self, widget):
         self.widget = widget
@@ -33,14 +35,7 @@ class StdoutRedirect:
 def qt_message_handler(mode, context, message):
     # ここでは print するだけ
     print(message)
-
-
-
-
-
-
-
-
+#--------------------------------------------------------------------------------------------------------------------------------------------------------
 
 
 
@@ -48,37 +43,18 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def __init__(self):
         super().__init__()
         self.setupUi(self)
-        self.text_log = self.textBrowser_widget_log
-        #logの設定
-        # 現在の日時を取得
-        now= datetime.now()
-        self.text_log.setPlainText(f"・{now.year}/{now.month}/{now.day} {now.hour}:{now.minute}:{now.second}")
-        self.text_log.appendPlainText("フーリエ変換ver3.0 起動")
 
-#デバッグ用-----------------------------------------------------------------------------------------------------------------------------------
+        #デバッグ用-----------------------------------------------------------------------------------------------------------------------------------
         # stdout / stderr を UI に流す
-        sys.stdout = StdoutRedirect(self.text_log)
-        sys.stderr = StdoutRedirect(self.text_log)
+        #sys.stdout = StdoutRedirect(self.text_log)
+        #sys.stderr = StdoutRedirect(self.text_log)
 
         # 動作確認用
-        print("Debug Mode Start!!")
+        #print("Debug Mode Start!!")
+        #--------------------------------------------------------------------------------------------------------------------------------------------
 
-
-#--------------------------------------------------------------------------------------------------------------------------------------------
-
-
-        #ステータスバーの設定
-        self.statusBar().setStyleSheet("""
-        QStatusBar{
-        background-color: #f5f5f5;
-        font-size: 14px;
-        padding: 6px 8px;
-        border-bottom: 1px solid #e0e0e0;
-        }
-        """)
-        self.statusBar().showMessage("準備完了")
-
-        # widget取得
+        #--------------------------------------------------------ウィジェットの取得------------------------------------------------------------------
+        self.text_log = self.textBrowser_widget_log
         self.plotWidget_sin = self.plot_widget_sin
         self.plotWidget_cos = self.plot_widget_cos
         self.plotWidget_norm = self.plot_widget_norm
@@ -89,28 +65,60 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.button_before = self.pushButton_before
         self.list_import = self.list_View_import
         self.list_import.setIconSize(QSize(0, 0))
-        self.button_git = self.action_GitHub
         self.list_data = self.treeWidget_data
         self.list_data.setHeaderLabels(["内部データ"])
+        #メニューバー
+        self.button_exit = self.action_exit
+        self.button_git = self.action_GitHub
+        self.button_read = self.action_read
+
+        #初期化関数
+        QTimer.singleShot(0, self.initial_function)
+
+        #--------------------------------------------------------コネクト------------------------------------------------------------------
+        # --- クリック検出 ------------------
+        self.refer.clicked.connect(self.select_folder) #　参照ボタン
+        self.list_import.currentItemChanged.connect(self.filename_clicked) #ファイル名のアイテムがアクティブ化
+        self.button_select.clicked.connect(self.all_select) # 全選択ボタン
+        self.button_next.clicked.connect(self.next) # 次ボタン
+        self.button_before.clicked.connect(self.before) # 前ボタン
+
+        self.button_git.triggered.connect(self.open_github) # GitHubボタン
+        self.button_exit.triggered.connect(QApplication.quit) # 終了ボタン
+        self.button_read.triggered.connect(self.select_folder) # 読み込みボタン
+
+        #self.plotWidget_sin.scene().sigMouseClicked.connect(self.onClick)
+        #self.plotWidget_cos.scene().sigMouseClicked.connect(self.onClick)
+        #self.plotWidget_norm.scene().sigMouseClicked.connect(self.onClick)
+
+        # --- D&D検出 -------------------
+        self.list_import.filesDropped.connect(self.DandD) # リストへのドラッグアンドドロップ
 
 
 
-        #UIの lebel
-        #self.label_sin = self.label_widget_sin
-        #self.label_sin.setScaledContents(True)
-        #画像配置
 
+#-----------初期化-----------------------------------------------------------------------------------------------------------------------------------
 
+    def initial_function(self):
+        #--------------------------------------------------------ステータスバーの設定------------------------------------------------------------------
+        self.statusBar().setStyleSheet("""
+        QStatusBar{
+        background-color: #f5f5f5;
+        font-size: 14px;
+        padding: 6px 8px;
+        border-bottom: 1px solid #e0e0e0;
+        }
+        """)
+        self.statusBar().showMessage("準備完了")
 
-        # --- データ作成 ---
-        #変数の定義
-        zeropoint = 1400 #ゼロポイント
-        n_ind= 3441 #切り取り範囲(負)
-        p_ind = 4752 #切り取り範囲(正)
-        base_angle = np.pi / 100 #基本の位相回転角(フーリエ変換ver2.5参照)　optionで選択できるようにするかも
-        file_path = '10k0613T2F.1010'
+# ----------------------------------------------------- プロット表示 -----------------------------------------------------------------
+        # --- データ準備 ---
+        #zeropoint = 1400 #ゼロポイント
+        #n_ind= 3441 #切り取り範囲(負)
+        #p_ind = 4752 #切り取り範囲(正)
+        #base_angle = np.pi / 100 #基本の位相回転角(フーリエ変換ver2.5参照)　optionで選択できるようにするかも
 
-        # --------------------------- 表示 -----------------------------------------------------------------
+        #プロット初期設定
         self.plotWidget_sin.setLabel('left',"SIN",    **{'font-size': '12pt', 'color': 'k'})
         self.plotWidget_sin.setBackground("#FFFFFF00")
         self.plotWidget_sin.hideButtons()
@@ -138,38 +146,20 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         vbc.setMenuEnabled(False)
         vbn.setMenuEnabled(False)
 
-
-
         self.plotWidget_cos.setXLink(self.plotWidget_sin)
         self.plotWidget_norm.setXLink(self.plotWidget_sin)
         self.plotWidget_cos.setYLink(self.plotWidget_sin)
         self.plotWidget_norm.setYLink(self.plotWidget_sin)
-
-        # --- クリック検出 ---
-        self.refer.clicked.connect(self.select_folder) #　参照ボタン　to　エクスプローラーを開く関数
-        #self.plotWidget_sin.scene().sigMouseClicked.connect(self.onClick)
-        #self.plotWidget_cos.scene().sigMouseClicked.connect(self.onClick)
-        #self.plotWidget_norm.scene().sigMouseClicked.connect(self.onClick)
-        #self.list_import.itemClicked.connect(self.filename_clicked) # ファイルリストクリック to グラフ表示
-        self.list_import.currentItemChanged.connect(self.filename_clicked)
-        self.button_select.clicked.connect(self.all_select)
-        self.button_next.clicked.connect(self.next)
-        self.button_before.clicked.connect(self.before)
-        self.button_git.triggered.connect(self.open_github)
-
-        # --- D&D検出 ---
-        self.list_import.filesDropped.connect(self.DandD)
 
         # --- 前回の設定の読み込み ---
         self.latest_folder = settings.value("paths/latest_folder")
         if self.latest_folder:
             self.load_files(settings.value("paths/latest_folder"))
 
-
-
-
-
-
+        # 現在の日時を取得
+        now= datetime.now()
+        self.text_log.setPlainText(f"・{now.year}/{now.month}/{now.day} {now.hour}:{now.minute}:{now.second}")
+        self.text_log.appendPlainText("フーリエ変換ver3.0 起動")
 
 
 
@@ -193,6 +183,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def DandD(self, paths):
         path = paths[0] #先頭だけ表示
         self.statusBar().showMessage(path)
+        self.list_import.clear()
+        settings.setValue("paths/latest_folder",path)
         self.load_files(path)
 
     def load_files(self, folder):
@@ -462,6 +454,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
             self.statusBar().showMessage(f"clicked \"norm\" at x={nearest_x}, y={nearest_y:.4f}")
 
+#---------------------------------- メニューバー -----------------------------------------------------------
+
     def open_github(self):
         url = QUrl("https://github.com/E-Kraft/Unagi-project-FFT-Software-for-Itou-Lab.-")
         QDesktopServices.openUrl(url)
@@ -469,10 +463,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
 
 
-
+#--------------------------------------------------------- メインの実行部 --------------------------------------------------------------------------------
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    qInstallMessageHandler(qt_message_handler)
+    #qInstallMessageHandler(qt_message_handler)
     apply_stylesheet(app, theme='light_blue.xml',)
     #apply_stylesheet(app, theme='dark_blue.xml',)
     win = MainWindow()
