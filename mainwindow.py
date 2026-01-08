@@ -3,7 +3,7 @@ import os
 import numpy as np
 from PySide6.QtCore import Qt, QSize, QSettings, QUrl, QThread, QObject, Signal, qInstallMessageHandler, QtMsgType, qWarning, QTimer
 from PySide6.QtGui import QDesktopServices
-from PySide6.QtWidgets import QApplication, QMainWindow, QFileDialog, QListWidgetItem, QTreeWidgetItem
+from PySide6.QtWidgets import QApplication, QMainWindow, QFileDialog, QListWidgetItem, QTreeWidgetItem,QDialog, QVBoxLayout, QTextBrowser, QPushButton
 from PySide6.QtUiTools import loadUiType
 import pyqtgraph as pg
 from qt_material import apply_stylesheet
@@ -35,6 +35,58 @@ class StdoutRedirect:
 def qt_message_handler(mode, context, message):
     # ここでは print するだけ
     print(message)
+
+ABOUT_THIS_MD = """
+# フーリエ変換Ver3シリーズ
+- これは伊藤研究室で用いるNMR解析用フーリエ変換アプリです。
+- これまで使われてきたフーリエ変換ver2.5の欠点を克服し、新たな機能を追加しています。
+- 内容については順次更新します。
+"""
+class AboutDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+        self.setWindowTitle("このアプリについて")
+        self.resize(500, 400)
+
+        layout = QVBoxLayout(self)
+
+        browser = QTextBrowser()
+        browser.setMarkdown(ABOUT_THIS_MD)
+        browser.setOpenExternalLinks(True)
+
+        close_button = QPushButton("閉じる")
+        close_button.clicked.connect(self.accept)
+
+        layout.addWidget(browser)
+        layout.addWidget(close_button)
+
+
+VERSION_HISTORY_MD = """
+# Ver3.0.0 β (2026/1/9)
+- この項目を追加
+"""
+
+class VersionDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+        self.setWindowTitle("バージョン履歴")
+        self.resize(500, 400)
+
+        layout = QVBoxLayout(self)
+
+        browser = QTextBrowser()
+        browser.setMarkdown(VERSION_HISTORY_MD)
+        browser.setOpenExternalLinks(True)
+
+        close_button = QPushButton("閉じる")
+        close_button.clicked.connect(self.accept)
+
+        layout.addWidget(browser)
+        layout.addWidget(close_button)
+
+
 #--------------------------------------------------------------------------------------------------------------------------------------------------------
 
 
@@ -54,6 +106,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         #--------------------------------------------------------------------------------------------------------------------------------------------
 
         #--------------------------------------------------------ウィジェットの取得------------------------------------------------------------------
+        self.dock = self.dockWidget
         self.text_log = self.textBrowser_widget_log
         self.plotWidget_sin = self.plot_widget_sin
         self.plotWidget_cos = self.plot_widget_cos
@@ -71,6 +124,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.button_exit = self.action_exit
         self.button_git = self.action_GitHub
         self.button_read = self.action_read
+        self.button_dock = self.action_dock
+        self.button_ver = self.action_ver
+        self.button_thisapp = self.action_thisapp
 
         #初期化関数
         QTimer.singleShot(0, self.initial_function)
@@ -84,9 +140,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.button_before.clicked.connect(self.before) # 前ボタン
 
         self.button_git.triggered.connect(self.open_github) # GitHubボタン
-        self.button_exit.triggered.connect(QApplication.quit) # 終了ボタン
+        self.button_exit.triggered.connect(self.quit_event) # 終了ボタン
         self.button_read.triggered.connect(self.select_folder) # 読み込みボタン
-
+        self.button_dock.toggled.connect(self.dock.setVisible) # ドックの表示切り替えボタン
+        self.dock.visibilityChanged.connect(self.button_dock.setChecked) # ドックのオン/オフの表示切り替え
+        self.button_ver.triggered.connect(self.show_version_dialog) #バージョン履歴ボタン
+        self.button_thisapp.triggered.connect(self.show_thisapp_dialog)
         #self.plotWidget_sin.scene().sigMouseClicked.connect(self.onClick)
         #self.plotWidget_cos.scene().sigMouseClicked.connect(self.onClick)
         #self.plotWidget_norm.scene().sigMouseClicked.connect(self.onClick)
@@ -152,9 +211,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.plotWidget_norm.setYLink(self.plotWidget_sin)
 
         # --- 前回の設定の読み込み ---
-        self.latest_folder = settings.value("paths/latest_folder")
-        if self.latest_folder:
+        latest_folder = settings.value("paths/latest_folder")
+        if latest_folder:
             self.load_files(settings.value("paths/latest_folder"))
+
+        visible = settings.value("dockVisible",True,type=bool)
+        self.dock.setVisible(visible)
 
         # 現在の日時を取得
         now= datetime.now()
@@ -454,11 +516,29 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
             self.statusBar().showMessage(f"clicked \"norm\" at x={nearest_x}, y={nearest_y:.4f}")
 
+    def quit_event(self,event):
+        self.dock.hide()
+        QApplication.quit()
+
+    def closeEvent(self, event):
+        settings.setValue("dockVisible",self.dockWidget.isVisible()) #終了時にログの表示/非表示を保存
+        super().closeEvent(event)
+
+
+
 #---------------------------------- メニューバー -----------------------------------------------------------
 
     def open_github(self):
         url = QUrl("https://github.com/E-Kraft/Unagi-project-FFT-Software-for-Itou-Lab.-")
         QDesktopServices.openUrl(url)
+
+    def show_version_dialog(self):
+        dialog = VersionDialog(self)
+        dialog.exec()
+
+    def show_thisapp_dialog(self):
+        dialog = AboutDialog(self)
+        dialog.exec()
 
 
 

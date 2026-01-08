@@ -351,21 +351,8 @@
     <property name="title">
      <string>表示</string>
     </property>
-    <widget class="QMenu" name="menu_2">
-     <property name="font">
-      <font>
-       <family>メイリオ</family>
-      </font>
-     </property>
-     <property name="title">
-      <string>テーマ</string>
-     </property>
-     <addaction name="action_light"/>
-     <addaction name="action_dark"/>
-    </widget>
-    <addaction name="action_lighttheme"/>
+    <addaction name="action_dock"/>
     <addaction name="separator"/>
-    <addaction name="menu_2"/>
    </widget>
    <addaction name="menu_widget_file"/>
    <addaction name="menu_3"/>
@@ -378,6 +365,9 @@
    </property>
   </widget>
   <widget class="QDockWidget" name="dockWidget">
+   <property name="enabled">
+    <bool>true</bool>
+   </property>
    <property name="sizePolicy">
     <sizepolicy hsizetype="Minimum" vsizetype="Preferred">
      <horstretch>0</horstretch>
@@ -439,7 +429,7 @@
     <string>最近使用したファイル</string>
    </property>
   </action>
-  <action name="action_lighttheme">
+  <action name="action_dock">
    <property name="checkable">
     <bool>true</bool>
    </property>

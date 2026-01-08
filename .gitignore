@@ -12,3 +12,7 @@ wheels/
 
 # excel files
 *.xlsx
+
+# release files
+mainwindow_release.py
+mainui.py
