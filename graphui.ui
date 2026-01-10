@@ -353,6 +353,7 @@
     </property>
     <addaction name="action_dock"/>
     <addaction name="separator"/>
+    <addaction name="action_size"/>
    </widget>
    <addaction name="menu_widget_file"/>
    <addaction name="menu_3"/>
@@ -526,6 +527,16 @@
    </property>
    <property name="text">
     <string>ダークモード</string>
+   </property>
+   <property name="font">
+    <font>
+     <family>メイリオ</family>
+    </font>
+   </property>
+  </action>
+  <action name="action_size">
+   <property name="text">
+    <string>デフォルトサイズ</string>
    </property>
    <property name="font">
     <font>

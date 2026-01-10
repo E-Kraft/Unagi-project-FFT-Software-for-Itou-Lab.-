@@ -16,7 +16,7 @@ pg.setConfigOptions(useOpenGL=True) #　グラフの描画にOpenGLを利用し�
 pg.setConfigOption('foreground', 'k') #グラフを黒色に
 Ui_MainWindow, _ = loadUiType("graphui.ui")
 
-#デバッグモード用--------------------------------------------------------------------------------------------------------------------------------------
+#デバッグモード用バージョン情報用--------------------------------------------------------------------------------------------------------------------------------------
 #使用する場合はqInstallMessageHandler(qt_message_handler)とstdout / stderrのコメントをオフに
 #コンソールの内容を受け取るクラス
 class StdoutRedirect:
@@ -105,7 +105,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         #print("Debug Mode Start!!")
         #--------------------------------------------------------------------------------------------------------------------------------------------
 
-        #--------------------------------------------------------ウィジェットの取得------------------------------------------------------------------
+#--------------------------------------------------------ウィジェットの取得------------------------------------------------------------------
         self.dock = self.dockWidget
         self.text_log = self.textBrowser_widget_log
         self.plotWidget_sin = self.plot_widget_sin
@@ -127,11 +127,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.button_dock = self.action_dock
         self.button_ver = self.action_ver
         self.button_thisapp = self.action_thisapp
+        self.button_default = self.action_size
 
         #初期化関数
         QTimer.singleShot(0, self.initial_function)
 
-        #--------------------------------------------------------コネクト------------------------------------------------------------------
+#--------------------------------------------------------コネクト------------------------------------------------------------------
         # --- クリック検出 ------------------
         self.refer.clicked.connect(self.select_folder) #　参照ボタン
         self.list_import.currentItemChanged.connect(self.filename_clicked) #ファイル名のアイテムがアクティブ化
@@ -145,7 +146,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.button_dock.toggled.connect(self.dock.setVisible) # ドックの表示切り替えボタン
         self.dock.visibilityChanged.connect(self.button_dock.setChecked) # ドックのオン/オフの表示切り替え
         self.button_ver.triggered.connect(self.show_version_dialog) #バージョン履歴ボタン
-        self.button_thisapp.triggered.connect(self.show_thisapp_dialog)
+        self.button_thisapp.triggered.connect(self.show_thisapp_dialog) #このアプリについて
+        self.button_default.triggered.connect(self.resize_default)
         #self.plotWidget_sin.scene().sigMouseClicked.connect(self.onClick)
         #self.plotWidget_cos.scene().sigMouseClicked.connect(self.onClick)
         #self.plotWidget_norm.scene().sigMouseClicked.connect(self.onClick)
@@ -217,6 +219,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         visible = settings.value("dockVisible",True,type=bool)
         self.dock.setVisible(visible)
+        self.default_size = self.size()
+        self.restoreGeometry(settings.value("geometry", b""))
 
         # 現在の日時を取得
         now= datetime.now()
@@ -253,11 +257,16 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.path_text.setText(folder)
         self.statusBar().showMessage("読み込み中")
         # 直下のファイル
-        for name in os.listdir(folder):
-            full = os.path.join(folder, name)
-            if os.path.isfile(full):
-                if NMR.header_check(full) == True:
-                    self.add_checked_item(name,full)
+        files = os.listdir(folder)
+        if len(files) != 0:
+            for name in os.listdir(folder):
+                full = os.path.join(folder, name)
+                if os.path.isfile(full):
+                    if NMR.header_check(full) == True:
+                        self.add_checked_item(name,full)
+        else:
+            self.statusBar().showMessage("ファイルが存在しません:"+folder)
+            return None
 
         # 1階層下のファイル
         for name in os.listdir(folder):
@@ -522,6 +531,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def closeEvent(self, event):
         settings.setValue("dockVisible",self.dockWidget.isVisible()) #終了時にログの表示/非表示を保存
+        settings.setValue("geometry",self.saveGeometry())
         super().closeEvent(event)
 
 
@@ -540,6 +550,16 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         dialog = AboutDialog(self)
         dialog.exec()
 
+    def resize_default(self):
+        self.setWindowState(Qt.WindowNoState)
+        self.resize(self.default_size)
+        screen = self.screen()
+        screen_geometry = screen.availableGeometry()
+
+        window_geometry = self.frameGeometry()
+        window_geometry.moveCenter(screen_geometry.center())
+        self.move(window_geometry.topLeft())  # 任意のデフォルト位置
+
 
 
 
@@ -548,7 +568,6 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     #qInstallMessageHandler(qt_message_handler)
     apply_stylesheet(app, theme='light_blue.xml',)
-    #apply_stylesheet(app, theme='dark_blue.xml',)
     win = MainWindow()
     win.show()
     sys.exit(app.exec())

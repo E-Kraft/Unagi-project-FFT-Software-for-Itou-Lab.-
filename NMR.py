@@ -200,11 +200,14 @@ class raw:
 def header_check(path):
     with open(path,'rb') as f:
         data = f.read()
-        header = np.array(struct.unpack_from('5h',data,0))
-        if all(header == check_header):
-            return True
-        else:
-            return False
+    if len(data) < 10: #10バイト未満の場合は排除
+        return False
+
+    header = np.array(struct.unpack_from('5h',data,0))
+    if all(header == check_header):
+        return True
+    else:
+        return False
 
 #生データをrawクラスのインスタンスとしてインポート
 def import_rawdata(path):
@@ -213,6 +216,9 @@ def import_rawdata(path):
             raw_data = raw(path)
             data = f.read()
             #ヘッダーの読み取り
+            if len(data) < 10: #10バイト未満の場合は排除
+                raise Exception('Not NMR signal file!') #NMRの信号ファイルではなかった場合例外を発生
+
             header = np.array(struct.unpack_from('5h',data,0))
             if all(header == check_header):
                 for name ,dict in block_def.items():
