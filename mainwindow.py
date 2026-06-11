@@ -9,6 +9,8 @@ import pyqtgraph as pg
 from qt_material import apply_stylesheet
 import NMR
 from datetime import datetime
+from subwindow import FFTDialog
+from pathlib import Path
 
 # --- 初期設定 ---
 settings = QSettings("FFTver3_series", "FFTver3.0") # アプリ終了後の設定保存用ファイル
@@ -90,12 +92,10 @@ class VersionDialog(QDialog):
 #--------------------------------------------------------------------------------------------------------------------------------------------------------
 
 
-
 class MainWindow(QMainWindow, Ui_MainWindow):
     def __init__(self):
         super().__init__()
         self.setupUi(self)
-
         #デバッグ用-----------------------------------------------------------------------------------------------------------------------------------
         # stdout / stderr を UI に流す
         #sys.stdout = StdoutRedirect(self.text_log)
@@ -116,6 +116,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.button_select = self.pushButton_allselect
         self.button_next = self.pushButton_next
         self.button_before = self.pushButton_before
+        self.button_fft = self.pushButton_fft
         self.list_import = self.list_View_import
         self.list_import.setIconSize(QSize(0, 0))
         self.list_data = self.treeWidget_data
@@ -139,6 +140,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.button_select.clicked.connect(self.all_select) # 全選択ボタン
         self.button_next.clicked.connect(self.next) # 次ボタン
         self.button_before.clicked.connect(self.before) # 前ボタン
+        self.button_fft.clicked.connect(self.fft)
+        self.pushButton_raw.clicked.connect(self.exp_raw) # 生データ出力ボタン
 
         self.button_git.triggered.connect(self.open_github) # GitHubボタン
         self.button_exit.triggered.connect(self.quit_event) # 終了ボタン
@@ -215,7 +218,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         # --- 前回の設定の読み込み ---
         latest_folder = settings.value("paths/latest_folder")
         if latest_folder:
-            self.load_files(settings.value("paths/latest_folder"))
+            if os.path.isdir(settings.value("paths/latest_folder")):
+                self.load_files(settings.value("paths/latest_folder"))
+            else:
+                settings.remove("paths/latest_folder")
 
         visible = settings.value("dockVisible",True,type=bool)
         self.dock.setVisible(visible)
@@ -534,6 +540,49 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         settings.setValue("geometry",self.saveGeometry())
         super().closeEvent(event)
 
+    def fft(self):
+        dlg=FFTDialog(self)
+        dlg.exec()
+
+    def exp_raw(self):
+        folder_path = QFileDialog.getExistingDirectory(self,"保存先フォルダを選択",settings.value("paths/latest_folder"))
+
+        if not folder_path:
+            return  # キャンセルされた場合
+        
+        if not os.path.isdir(settings.value("paths/latest_folder")):
+            now= datetime.now()
+            self.text_log.appendPlainText(f"・{now.year}/{now.month}/{now.day} {now.hour}:{now.minute}:{now.second}")
+            self.text_log.appendPlainText(f"保存先のフォルダ{settings.value("paths/latest_folder")}が存在しません")
+            return # なぜかフォルダが消えた場合
+
+        count = 0
+        for i in range(self.list_import.count()):
+            item = self.list_import.item(i)
+
+            if item.checkState() == Qt.Checked:
+                fullpath = item.data(Qt.UserRole)
+                filename = item.text()
+
+                raw_data = NMR.import_rawdata(fullpath)
+                time = raw_data.time_column()
+                cos = raw_data.normalize_cos()
+                sin = raw_data.normalize_sin()
+                abs = np.sqrt(cos**2+sin**2)
+
+                data = np.column_stack((time, cos, sin, abs))
+                filename = filename.replace(".","_")
+                exp_folder = folder_path +"\\"+ filename+".csv"
+
+                np.savetxt(exp_folder, data,delimiter=",",header="time,cos,sin,abs",comments="")
+                count += 1
+        
+        now= datetime.now()
+        self.text_log.appendPlainText(f"・{now.year}/{now.month}/{now.day} {now.hour}:{now.minute}:{now.second}")
+        self.text_log.appendPlainText(f"{count}個のファイルを{folder_path}に出力しました")
+        self.statusBar().showMessage("出力完了")
+
+
 
 
 #---------------------------------- メニューバー -----------------------------------------------------------
@@ -561,6 +610,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.move(window_geometry.topLeft())  # 任意のデフォルト位置
 
 
+#class SubWindow(QWidget, Ui_SubWindow):
+#   def __init__(self,parent=None):
+#       super().__init__(parent)
+#       self.setupUi(self)
 
 
 #--------------------------------------------------------- メインの実行部 --------------------------------------------------------------------------------
