@@ -570,11 +570,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 sin = raw_data.normalize_sin()
                 abs = np.sqrt(cos**2+sin**2)
 
-                data = np.column_stack((time, cos, sin, abs))
+                data = np.column_stack((time, sin, cos, abs))
                 filename = filename.replace(".","_")
                 exp_folder = folder_path +"\\"+ filename+".csv"
 
-                np.savetxt(exp_folder, data,delimiter=",",header="time,cos,sin,abs",comments="")
+                np.savetxt(exp_folder, data,delimiter=",",header="time [s],cos,sin,abs",comments="")
                 count += 1
         
         now= datetime.now()
