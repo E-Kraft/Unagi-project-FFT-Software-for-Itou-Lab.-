@@ -63,7 +63,7 @@ block_def = {
 }
 
 #測定データのヘッダー(10バイト,2バイトずつ)
-check_header = np.array([1,8192,0,0,0])
+check_header_8192 = np.array([1,8192,0,0,0])
 
 #生データクラスを定義
 class raw:
@@ -204,13 +204,15 @@ def header_check(path):
         return False
 
     header = np.array(struct.unpack_from('5h',data,0))
-    if all(header == check_header):
+    if all(header == check_header_8192):
         return True
+    elif header[0]==1 and header[2]==0 and header[3]==0 and header[4]==0:
+        return header[1]
     else:
         return False
 
 #生データをrawクラスのインスタンスとしてインポート
-def import_rawdata(path):
+def import_rawdata(path,check_header=check_header_8192):
     try:
         with open(path,'rb') as f:
             raw_data = raw(path)

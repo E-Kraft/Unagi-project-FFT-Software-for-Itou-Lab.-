@@ -338,6 +338,7 @@
     <addaction name="action_zeropad"/>
     <addaction name="action_windowfunc"/>
     <addaction name="action_angle"/>
+    <addaction name="action_8192"/>
    </widget>
    <widget class="QMenu" name="menu_widget_help">
     <property name="title">
@@ -542,6 +543,14 @@
     <font>
      <family>メイリオ</family>
     </font>
+   </property>
+  </action>
+  <action name="action_8192">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>8192点以外も表示</string>
    </property>
   </action>
  </widget>
