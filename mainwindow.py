@@ -9,7 +9,6 @@ import pyqtgraph as pg
 from qt_material import apply_stylesheet
 import NMR
 from datetime import datetime
-from subwindow import FFTDialog
 from pathlib import Path
 
 # --- 初期設定 ---
@@ -151,6 +150,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.button_ver.triggered.connect(self.show_version_dialog) #バージョン履歴ボタン
         self.button_thisapp.triggered.connect(self.show_thisapp_dialog) #このアプリについて
         self.button_default.triggered.connect(self.resize_default)
+        self.action_8192.toggled.connect(self.reload_if_8192)
         #self.plotWidget_sin.scene().sigMouseClicked.connect(self.onClick)
         #self.plotWidget_cos.scene().sigMouseClicked.connect(self.onClick)
         #self.plotWidget_norm.scene().sigMouseClicked.connect(self.onClick)
@@ -270,6 +270,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 if os.path.isfile(full):
                     if NMR.header_check(full) == True:
                         self.add_checked_item(name,full)
+                    elif NMR.header_check(full) != False:
+                        self.text_log.appendPlainText("Warning:測定点数が8192点ではありません")
+                        self.text_log.appendPlainText(str(name))
+                        self.text_log.appendPlainText(str(NMR.header_check(full)))
+                        if self.action_8192.isChecked() == 1:
+                            self.add_checked_item(name,full)
         else:
             self.statusBar().showMessage("ファイルが存在しません:"+folder)
             return None
@@ -283,6 +289,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                     if os.path.isfile(sub_full):
                         if NMR.header_check(sub_full) == True:
                             self.add_checked_item(sub,sub_full)
+                        elif NMR.header_check(full) != False:
+                            self.text_log.appendPlainText("Warning:測定点数が8192点ではありません")
+                            self.text_log.appendPlainText(str(name))
+                            self.text_log.appendPlainText("サンプル数:"+str(NMR.header_check(full)))
+                            if self.action_8192.isChecked() == 1:
+                                self.add_checked_item(sub,sub_full)
         self.statusBar().showMessage("読み込み完了:"+folder)
 
     def add_checked_item(self, sub, fullpath):
@@ -470,6 +482,19 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.vline_cos.hide()
         self.vline_norm.hide()
 
+        vbs = self.plotWidget_sin.getViewBox()
+        vbc = self.plotWidget_cos.getViewBox()
+        vbn = self.plotWidget_norm.getViewBox()
+        
+        y_range = np.amax(self.yp)
+        x_range = raw_data.wavesize
+        vbs.setLimits(xMin=0, xMax=x_range)
+        vbc.setLimits(xMin=0, xMax=x_range)
+        vbn.setLimits(xMin=0, xMax=x_range)
+        vbs.setRange(xRange=(0, 8192/2), yRange=(-y_range, y_range))
+        vbc.setRange(xRange=(0, 8192/2), yRange=(-y_range, y_range))
+        vbn.setRange(xRange=(0, 8192/2), yRange=(-y_range, y_range))
+
 
     def onClick(self, event):
         pos = event.scenePos()
@@ -549,7 +574,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         if not folder_path:
             return  # キャンセルされた場合
-        
+
         if not os.path.isdir(settings.value("paths/latest_folder")):
             now= datetime.now()
             self.text_log.appendPlainText(f"・{now.year}/{now.month}/{now.day} {now.hour}:{now.minute}:{now.second}")
@@ -608,6 +633,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         window_geometry = self.frameGeometry()
         window_geometry.moveCenter(screen_geometry.center())
         self.move(window_geometry.topLeft())  # 任意のデフォルト位置
+
+    def reload_if_8192(self):
+        self.list_import.clear()
+        self.load_files(settings.value("paths/latest_folder"))
 
 
 #class SubWindow(QWidget, Ui_SubWindow):

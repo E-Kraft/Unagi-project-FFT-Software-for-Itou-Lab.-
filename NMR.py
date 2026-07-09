@@ -1,5 +1,6 @@
 import numpy as np #FFTに使用します
 import struct #バイナリの読み込みに使用します
+from copy import deepcopy
 
 #-------------------今後追加予定の項目------------------------------------
 #ゼロパディングモードの実装
@@ -212,7 +213,7 @@ def header_check(path):
         return False
 
 #生データをrawクラスのインスタンスとしてインポート
-def import_rawdata(path,check_header=check_header_8192):
+def import_rawdata(path):
     try:
         with open(path,'rb') as f:
             raw_data = raw(path)
@@ -222,7 +223,7 @@ def import_rawdata(path,check_header=check_header_8192):
                 raise Exception('Not NMR signal file!') #NMRの信号ファイルではなかった場合例外を発生
 
             header = np.array(struct.unpack_from('5h',data,0))
-            if all(header == check_header):
+            if all(header == check_header_8192):
                 for name ,dict in block_def.items():
                     cache = np.array(struct.unpack_from(dict['type'],data,dict['offset'])) #値はタプルで返される
                     #タプルの要素が一つなら数値に戻す
@@ -230,14 +231,55 @@ def import_rawdata(path,check_header=check_header_8192):
                         cache = cache[0]
                     setattr(raw_data,name,cache) #nameのプロパティに代入
                 #バイト列から文字列に修正
-                raw_data.mDate = bytes(raw_data.mDate).decode().strip()
-                raw_data.mTime = bytes(raw_data.mTime).decode().strip()
-                raw_data.mTitle = bytes(raw_data.mTitle).decode().strip()
+                raw_data.mDate = raw_data.mDate.tobytes().strip().decode()
+                raw_data.mTime = raw_data.mTime.tobytes().strip().decode()
+                raw_data.mTitle = raw_data.mTitle.tobytes().strip().decode("cp932")
                 return  raw_data
+
+            #サンプリング数が8192ではないとき
+            elif all(header == check_header_8192) ==False:
+                block_def_new = update_offsets(block_def,int((header[1]-8192)*4))
+                for name ,dict in block_def_new.items():
+                    cache = np.array(struct.unpack_from(dict['type'],data,dict['offset'])) #値はタプルで返される
+                    #タプルの要素が一つなら数値に戻す
+                    if len(cache) == 1:
+                        cache = cache[0]
+                    setattr(raw_data,name,cache) #nameのプロパティに代入
+                #バイト列から文字列に修正
+                raw_data.mDate = raw_data.mDate.tobytes().decode().strip()
+                raw_data.mTime = raw_data.mTime.tobytes().decode().strip()
+                raw_data.mTitle = raw_data.mTitle.tobytes().decode("cp932").strip()
+                return  raw_data
+
             else:
                 raise Exception('Not NMR signal file!') #NMRの信号ファイルではなかった場合例外を発生
     except Exception as e:
         print(f"エラーが発生しました : {e}") #この関数内で起こった例外はすべてここで処理される
+
+
+
+def update_offsets(block_def, n):
+    """
+    n: 増やすバイト数
+    """
+    new_block_def = deepcopy(block_def)
+
+    keys = list(new_block_def.keys())
+
+    # sin は cos の後ろにあるので +n
+    new_block_def['sin']['offset'] += n
+
+    # sin より後ろの項目は cos と sin の増加分で +2n
+    sin_index = keys.index('sin')
+
+    for key in keys[sin_index + 1:]:
+        new_block_def[key]['offset'] += 2 * n
+
+    new_count = int(8192+n/4)
+    new_block_def['cos']['type'] = f"{new_count}f"
+    new_block_def['sin']['type'] = f"{new_count}f"
+
+    return new_block_def
 
 #位相調整(nは整数を入れる)
 def phase_shift(fft_result,n,base_angle = np.pi / 100):
